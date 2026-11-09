@@ -1,4 +1,5 @@
-
+import joblib
+from pathlib import Path
 import pandas as pd
 
 from sklearn.model_selection import train_test_split
@@ -16,13 +17,44 @@ df = df.drop_duplicates()
 X = df.drop("Class", axis=1)
 y = df["Class"]
 
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(
+# Split 1: Separate final test data
+X_temp, X_test, y_temp, y_test = train_test_split(
     X, y,
     test_size=0.2,
     random_state=42,
     stratify=y
 )
+
+# Split 2: Separate training and validation data
+X_train, X_val, y_train, y_val = train_test_split(
+    X_temp, y_temp,
+    test_size=0.25,
+    random_state=42,
+    stratify=y_temp
+)
+
+# Scale Amount and Time
+scaler = StandardScaler()
+
+X_train = X_train.copy()
+X_val = X_val.copy()
+X_test = X_test.copy()
+
+X_train[["Amount", "Time"]] = scaler.fit_transform(
+    X_train[["Amount", "Time"]]
+)
+
+X_val[["Amount", "Time"]] = scaler.transform(
+    X_val[["Amount", "Time"]]
+)
+
+X_test[["Amount", "Time"]] = scaler.transform(
+    X_test[["Amount", "Time"]]
+)
+
+print("Training:", X_train.shape)
+print("Validation:", X_val.shape)
+print("Testing:", X_test.shape)
 
 # Scale numerical columns
 scaler = StandardScaler()
@@ -45,13 +77,37 @@ model = LogisticRegression(
 )
 model.fit(X_train, y_train)
 
-# Predictions
-y_pred = model.predict(X_test)
+from sklearn.metrics import classification_report, confusion_matrix
 
-# Evaluation
-print("\n--- CONFUSION MATRIX ---")
-print(confusion_matrix(y_test, y_pred))
+y_prob = model.predict_proba(X_val)[:, 1]
+# Final evaluation on unseen test data
+FINAL_THRESHOLD = 0.99
 
-print("\n--- CLASSIFICATION REPORT ---")
-print(classification_report(y_test, y_pred))
+y_test_prob = model.predict_proba(X_test)[:, 1]
 
+y_test_pred = (
+    y_test_prob >= FINAL_THRESHOLD
+).astype(int)
+
+print("\n--- FINAL TEST RESULTS ---")
+print("Selected threshold:", FINAL_THRESHOLD)
+
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, y_test_pred))
+
+print("\nClassification Report:")
+print(classification_report(y_test, y_test_pred))
+
+# Save trained model and scaler
+MODEL_DIR = Path("src/models")
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
+joblib.dump(model, MODEL_DIR / "fraud_model.pkl")
+joblib.dump(scaler, MODEL_DIR / "scaler.pkl")
+
+joblib.dump(
+    FINAL_THRESHOLD,
+    MODEL_DIR / "threshold.pkl"
+)
+
+print("\nModel, scaler and threshold saved successfully!")
