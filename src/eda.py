@@ -23,3 +23,12 @@ print(
 print("\n--- DUPLICATE RECORDS ---")
 print(df.duplicated().sum())
 
+# 5. Duplicate breakdown by transaction type
+print("\n--- DUPLICATES BY CLASS ---")
+
+duplicates = df[df.duplicated()]
+
+print(duplicates["Class"].value_counts())
+
+print("\n--- DUPLICATE ROWS INCLUDING ORIGINALS ---")
+print(df[df.duplicated(keep=False)].shape[0])
