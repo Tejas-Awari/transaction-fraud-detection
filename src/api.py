@@ -55,7 +55,8 @@ class Transaction(BaseModel):
     V27: float
     V28: float
 
-    Amount: float
+    from pydantic import Field
+    Amount: float = Field(ge=0)
 
 
 @app.get("/")
