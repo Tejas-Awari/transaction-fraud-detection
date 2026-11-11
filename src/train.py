@@ -1,10 +1,10 @@
 import joblib
 from pathlib import Path
 import pandas as pd
+import xgboost as xgb
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix
 
 # Load dataset
@@ -33,25 +33,6 @@ X_train, X_val, y_train, y_val = train_test_split(
     stratify=y_temp
 )
 
-# Scale Amount and Time
-scaler = StandardScaler()
-
-X_train = X_train.copy()
-X_val = X_val.copy()
-X_test = X_test.copy()
-
-X_train[["Amount", "Time"]] = scaler.fit_transform(
-    X_train[["Amount", "Time"]]
-)
-
-X_val[["Amount", "Time"]] = scaler.transform(
-    X_val[["Amount", "Time"]]
-)
-
-X_test[["Amount", "Time"]] = scaler.transform(
-    X_test[["Amount", "Time"]]
-)
-
 # Scale numerical columns
 scaler = StandardScaler()
 
@@ -72,18 +53,23 @@ X_val[["Amount", "Time"]] = scaler.transform(
 X_test[["Amount", "Time"]] = scaler.transform(
     X_test[["Amount", "Time"]]
 )
-# Train Logistic Regression
-model = LogisticRegression(
-    max_iter=1000,
-    class_weight="balanced"
+
+# Train XGBoost Model
+neg_cases = (y_train == 0).sum()
+pos_cases = (y_train == 1).sum()
+scale_weight = neg_cases / pos_cases
+
+print("Training XGBoost model...")
+model = xgb.XGBClassifier(
+    scale_pos_weight=scale_weight,
+    eval_metric="logloss",
+    random_state=42
 )
 model.fit(X_train, y_train)
 
-from sklearn.metrics import classification_report, confusion_matrix
-
-y_prob = model.predict_proba(X_val)[:, 1]
 # Final evaluation on unseen test data
-FINAL_THRESHOLD = 0.99
+# Lowered threshold to 0.5 because XGBoost probabilities are calibrated differently than Logistic Regression
+FINAL_THRESHOLD = 0.5
 
 y_test_prob = model.predict_proba(X_test)[:, 1]
 
@@ -104,7 +90,7 @@ print(classification_report(y_test, y_test_pred))
 MODEL_DIR = Path("src/models")
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
-joblib.dump(model, MODEL_DIR / "fraud_model.pkl")
+joblib.dump(model, MODEL_DIR / "xgboost_model.pkl")
 joblib.dump(scaler, MODEL_DIR / "scaler.pkl")
 
 joblib.dump(
