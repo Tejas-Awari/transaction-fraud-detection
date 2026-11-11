@@ -1,107 +1,22 @@
-# Transaction Fraud Detection API
+# Transaction Fraud Detection System
 
-A machine learning project that detects potentially fraudulent credit card transactions using Logistic Regression and exposes predictions through a FastAPI REST API.
+An event-driven, production-ready machine learning API built to detect fraudulent credit card transactions. 
 
-## Features
+## Architecture & Tech Stack
+* **Machine Learning:** XGBoost (handles severe class imbalance, F1-score: 0.83).
+* **Backend:** FastAPI (RESTful routing and Pydantic validation).
+* **Database:** PostgreSQL (SQLAlchemy ORM for logging transactions and prediction history).
+* **Infrastructure:** Docker (Containerized for cross-platform deployment).
 
-- Credit card transaction data analysis
-- Data cleaning and preprocessing
-- Handling imbalanced data using class weights
-- Logistic Regression classification
-- Threshold-based fraud detection
-- FastAPI prediction endpoint
-- Saved model, scaler, and threshold using Joblib
+## Model Performance Upgrade
+Initially built with Logistic Regression, the model was upgraded to an **XGBoost Classifier** using `scale_pos_weight`. 
+* Precision: 0.92
+* Recall: 0.76
+* F1-Score: 0.83
+* *False positives dropped significantly, minimizing disruptions for legitimate users.*
 
-## Tech Stack
-
-- Python 3.11
-- Pandas, NumPy
-- Scikit-learn
-- FastAPI
-- Uvicorn
-- Joblib
-
-## Model Performance
-
-Final test results:
-
-| Metric | Fraud Class |
-|---|---:|
-| Precision | 0.61 |
-| Recall | 0.79 |
-| F1-score | 0.69 |
-
-- True Positives: 75
-- False Negatives: 20
-- False Positives: 47
-- Decision threshold: 0.99
-
-## Project Structure
-
-```text
-transaction-fraud-detection/
-├── data/
-│   ├── raw/
-│   └── processed/
-├── notebooks/
-├── src/
-│   ├── models/
-│   │   ├── fraud_model.pkl
-│   │   ├── scaler.pkl
-│   │   └── threshold.pkl
-│   ├── api.py
-│   ├── preprocess.py
-│   └── train.py
-├── tests/
-├── requirements.txt
-└── README.md
-```
-
-## Dataset
-
-Credit Card Fraud Detection Dataset:
-
-https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud
-
-Download `creditcard.csv` and place it inside `data/raw/`.
-
-## Installation
-
+## Running Locally (Docker)
+Ensure Docker is running, then execute:
 ```bash
-git clone https://github.com/Tejas-Awari/transaction-fraud-detection.git
-
-cd transaction-fraud-detection
-
-python -m venv .venv
-
-source .venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-## Train the Model
-
-```bash
-python src/train.py
-```
-
-## Start the API
-
-```bash
-python -m uvicorn src.api:app --reload
-```
-
-Open Swagger documentation:
-
-http://127.0.0.1:8000/docs
-
-## API Endpoint
-
-`POST /predict`
-
-Accepts transaction features and returns:
-
-- Fraud prediction
-- Fraud probability
-- Decision threshold
-
+docker build -t transaction-fraud-api .
+docker run -p 8000:8000 transaction-fraud-api
