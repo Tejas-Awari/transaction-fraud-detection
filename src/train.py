@@ -52,24 +52,26 @@ X_test[["Amount", "Time"]] = scaler.transform(
     X_test[["Amount", "Time"]]
 )
 
-print("Training:", X_train.shape)
-print("Validation:", X_val.shape)
-print("Testing:", X_test.shape)
-
 # Scale numerical columns
 scaler = StandardScaler()
 
 X_train = X_train.copy()
+X_val = X_val.copy()
 X_test = X_test.copy()
 
+# Fit only on training data
 X_train[["Amount", "Time"]] = scaler.fit_transform(
     X_train[["Amount", "Time"]]
+)
+
+# Transform validation and test data
+X_val[["Amount", "Time"]] = scaler.transform(
+    X_val[["Amount", "Time"]]
 )
 
 X_test[["Amount", "Time"]] = scaler.transform(
     X_test[["Amount", "Time"]]
 )
-
 # Train Logistic Regression
 model = LogisticRegression(
     max_iter=1000,
