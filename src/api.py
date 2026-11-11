@@ -1,92 +1,86 @@
-
-from pathlib import Path
-
 import joblib
+from pathlib import Path
+from fastapi import FastAPI, Depends, HTTPException
+from pydantic import BaseModel, Field
 import pandas as pd
-from fastapi import FastAPI
-from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
+from .database import engine, Base, get_db
+from .models_db import TransactionRecord
 
-# Load saved model artifacts
-MODEL_DIR = Path(__file__).resolve().parent / "models"
+# Create database tables if they don't exist
+Base.metadata.create_all(bind=engine)
 
-model = joblib.load(MODEL_DIR / "fraud_model.pkl")
+app = FastAPI(title="Transaction Fraud Detection API")
+
+# Load model, scaler, and threshold
+MODEL_DIR = Path("src/models")
+model = joblib.load(MODEL_DIR / "xgboost_model.pkl")
 scaler = joblib.load(MODEL_DIR / "scaler.pkl")
 threshold = joblib.load(MODEL_DIR / "threshold.pkl")
 
-
-app = FastAPI(
-    title="Transaction Fraud Detection API",
-    description="API for detecting fraudulent credit card transactions",
-    version="1.0.0"
-)
-
-
-# Input schema
-class Transaction(BaseModel):
+# Pydantic input validation model
+class TransactionInput(BaseModel):
     Time: float
+    V1: float = 0.0
+    V2: float = 0.0
+    V3: float = 0.0
+    V4: float = 0.0
+    V5: float = 0.0
+    V6: float = 0.0
+    V7: float = 0.0
+    V8: float = 0.0
+    V9: float = 0.0
+    V10: float = 0.0
+    V11: float = 0.0
+    V12: float = 0.0
+    V13: float = 0.0
+    V14: float = 0.0
+    V15: float = 0.0
+    V16: float = 0.0
+    V17: float = 0.0
+    V18: float = 0.0
+    V19: float = 0.0
+    V20: float = 0.0
+    V21: float = 0.0
+    V22: float = 0.0
+    V23: float = 0.0
+    V24: float = 0.0
+    V25: float = 0.0
+    V26: float = 0.0
+    V27: float = 0.0
+    V28: float = 0.0
+    Amount: float = Field(..., ge=0, description="Transaction amount must be non-negative")
 
-    V1: float
-    V2: float
-    V3: float
-    V4: float
-    V5: float
-    V6: float
-    V7: float
-    V8: float
-    V9: float
-    V10: float
-    V11: float
-    V12: float
-    V13: float
-    V14: float
-    V15: float
-    V16: float
-    V17: float
-    V18: float
-    V19: float
-    V20: float
-    V21: float
-    V22: float
-    V23: float
-    V24: float
-    V25: float
-    V26: float
-    V27: float
-    V28: float
-
-    from pydantic import Field
-    Amount: float = Field(ge=0)
-
-
-@app.get("/")
-def home():
-    return {
-        "message": "Transaction Fraud Detection API is running"
-    }
-
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "model": "xgboost"}
 
 @app.post("/predict")
-def predict(transaction: Transaction):
-
-    # Convert input into DataFrame
-    data = pd.DataFrame([transaction.model_dump()])
-
-    # Scale Amount and Time
-    data[["Amount", "Time"]] = scaler.transform(
-        data[["Amount", "Time"]]
+def predict_fraud(transaction: TransactionInput, db: Session = Depends(get_db)):
+    # Convert input to DataFrame
+    input_data = pd.DataFrame([transaction.dict()])
+    
+    # Scale Amount and Time using the loaded scaler
+    input_data[["Amount", "Time"]] = scaler.transform(input_data[["Amount", "Time"]])
+    
+    # Predict probability
+    prob = float(model.predict_proba(input_data)[:, 1][0])
+    is_fraud = int(prob >= threshold)
+    
+    # Save transaction and prediction to PostgreSQL
+    db_record = TransactionRecord(
+        amount=transaction.Amount,
+        is_fraud=is_fraud,
+        fraud_probability=prob
     )
-
-    # Predict fraud probability
-    fraud_probability = model.predict_proba(data)[0][1]
-
-    # Apply selected threshold
-    prediction = int(fraud_probability >= threshold)
-
+    db.add(db_record)
+    db.commit()
+    db.refresh(db_record)
+    
     return {
-        "is_fraud": bool(prediction),
-        "prediction": "Fraud" if prediction else "Legitimate",
-        "fraud_probability": round(float(fraud_probability), 8),
-        "threshold": threshold
+        "fraud_probability": prob,
+        "is_fraud": bool(is_fraud),
+        "threshold_used": threshold,
+        "database_record_id": db_record.id
     }
-
